@@ -11,7 +11,7 @@ set -e
 usage() {
     echo "Usage: $0 -c <contigs.fasta> -d <mmseqs_db_path> -o <output_dir>"
     echo "Options:"
-    echo "  -c    Path to contigs FASTA file from SPAdes (required)"
+    echo "  -c    Path to contigs FASTA file from de novo (required)"
     echo "  -d    Path to MMseqs2 database (required)"
     echo "  -o    Output directory (required)"
     echo "  -t    Number of threads (default: 28)"
@@ -55,15 +55,19 @@ check_mmseqs() {
 # Function to create output directory structure
 create_dirs() {
     echo "Creating output directory structure..."
-    mkdir -p "$OUTDIR"/logs
-    mkdir -p "$OUTDIR"/tmp
+    if mkdir -p "$OUTDIR"/logs "$OUTDIR"/tmp; then
+        echo "Directories created successfully."
+    else
+        echo "Failed to create output directories. Aborting." >&2
+        exit 1
+    fi
 }
 
 # Function to create MMseqs2 database from contigs
 create_mmseqs_db() {
     echo "Creating MMseqs2 database from contigs..."
     mmseqs createdb "$CONTIGS" "$OUTDIR/contig" \
-        2> "$OUTDIR/logs/createdb.log" || { echo "Failed to create MMseqs2 database" >&2; exit 1; }
+        > "$OUTDIR/logs/createdb.log" 2>&1 || { echo "Failed to create MMseqs2 database" >&2; exit 1; }
 }
 
 # Function to run taxonomy assignment
@@ -75,8 +79,8 @@ run_taxonomy() {
         "$OUTDIR/lca_result" \
         "$OUTDIR/tmp" \
         -s "$SENSITIVITY" \
-        --threads "$THREADS" \
-        2> "$OUTDIR/logs/taxonomy.log" || { echo "Taxonomy assignment failed" >&2; exit 1; }
+        --threads "$THREADS"
+        > "$OUTDIR/logs/taxonomy.log" 2>&1 || { echo "Taxonomy assignment failed" >&2; exit 1; }
 }
 
 # Function to create TSV output
@@ -86,7 +90,7 @@ create_tsv() {
         "$OUTDIR/contig" \
         "$OUTDIR/lca_result" \
         "$OUTDIR/lca.tsv" \
-        2> "$OUTDIR/logs/createtsv.log" || { echo "TSV creation failed" >&2; exit 1; }
+        > "$OUTDIR/logs/createtsv.log" 2>&1 || { echo "TSV creation failed" >&2; exit 1; }
 }
 
 # Function to analyze contig hits
@@ -106,7 +110,7 @@ create_reports() {
         "$MMSEQS_DB" \
         "$OUTDIR/lca_result" \
         "$OUTDIR/report.txt" \
-        2> "$OUTDIR/logs/report.log" || { echo "Report creation failed" >&2; exit 1; }
+        > "$OUTDIR/logs/report.log" 2>&1 || { echo "Report creation failed" >&2; exit 1; }
 
     # Create Krona report
     mmseqs taxonomyreport \
@@ -114,7 +118,7 @@ create_reports() {
         "$OUTDIR/lca_result" \
         "$OUTDIR/report_krona.html" \
         --report-mode 1 \
-        2> "$OUTDIR/logs/krona_report.log" || { echo "Krona report creation failed" >&2; exit 1; }
+        > "$OUTDIR/logs/krona_report.log" 2>&1 || { echo "Krona report creation failed" >&2; exit 1; }
 }
 
 # Function to clean up temporary files
